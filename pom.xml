@@ -23,7 +23,6 @@
   <modules>
     <module>domain</module>
     <module>tenant</module>
-    <module>runtime</module>
   </modules>
 
   <packaging>pom</packaging>
