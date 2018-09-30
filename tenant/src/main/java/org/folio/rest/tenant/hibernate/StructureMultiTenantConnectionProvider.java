@@ -34,16 +34,16 @@ public class StructureMultiTenantConnectionProvider implements MultiTenantConnec
   }
 
   @Override
-  public Connection getConnection(String tenantIdentifier) throws SQLException {
+  public Connection getConnection(String tenant) throws SQLException {
     final Connection connection = getAnyConnection();
     try {
 
       switch (platform) {
       case "h2":
-        connection.createStatement().execute("USE " + tenantIdentifier);
+        connection.createStatement().execute("USE " + tenant);
         break;
       case "postgres":
-        connection.setSchema(tenantIdentifier);
+        connection.setSchema(tenant);
         break;
       default:
         throw new HibernateException("Unknown datasource platform [" + platform + "]");
@@ -57,13 +57,13 @@ public class StructureMultiTenantConnectionProvider implements MultiTenantConnec
       // connection.setSchema(tenantIdentifier);
       // connection.createStatement().execute("SET SCHEMA '" + tenantIdentifier + "';");
     } catch (SQLException e) {
-      throw new HibernateException("Could not alter JDBC connection to use schema [" + tenantIdentifier + "]", e);
+      throw new HibernateException("Could not alter JDBC connection to use schema [" + tenant + "]", e);
     }
     return connection;
   }
 
   @Override
-  public void releaseConnection(String tenantIdentifier, Connection connection) throws SQLException {
+  public void releaseConnection(String tenant, Connection connection) throws SQLException {
     try {
       switch (platform) {
       case "h2":

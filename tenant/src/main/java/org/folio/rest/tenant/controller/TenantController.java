@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -26,7 +25,6 @@ public class TenantController {
   private HibernateSchemaService hibernateSchemaService;
 
   @PostMapping
-  @ResponseStatus(HttpStatus.CREATED)
   // @formatter:off
   public ResponseEntity<String> create(
     @RequestHeader(required = true, value = TENANT_HEADER_NAME) String tenant,
@@ -34,17 +32,17 @@ public class TenantController {
   ) throws SQLException {
   // @formatter:on
     hibernateSchemaService.createTenant(tenant);
-    return ResponseEntity.ok("Success");
+    return new ResponseEntity<String>("Success", HttpStatus.CREATED);
   }
 
   @DeleteMapping
   // @formatter:off
-  public ResponseEntity<String> delete(
+  public ResponseEntity<Void> delete(
     @RequestHeader(required = true, value = TENANT_HEADER_NAME) String tenant
   ) throws SQLException {
   // @formatter:on
     hibernateSchemaService.deleteTenant(tenant);
-    return ResponseEntity.ok("Success");
+    return new ResponseEntity<Void>(HttpStatus.NO_CONTENT);
   }
 
 }

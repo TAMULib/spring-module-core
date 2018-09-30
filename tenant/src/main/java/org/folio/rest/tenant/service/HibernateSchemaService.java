@@ -2,6 +2,7 @@ package org.folio.rest.tenant.service;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -14,6 +15,8 @@ import javax.annotation.PostConstruct;
 import javax.persistence.Entity;
 
 import org.folio.rest.tenant.TenantConstants;
+import org.folio.rest.tenant.exception.TenantAlreadyExistsException;
+import org.folio.rest.tenant.exception.TenantDoesNotExistsException;
 import org.hibernate.boot.MetadataSources;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
@@ -72,25 +75,36 @@ public class HibernateSchemaService {
     dropSchema(getSettings(tenant));
   }
 
-  public void initializeSchema(String schema) throws SQLException {
-    Map<String, String> settings = getSettings(schema);
-    createSchemaIfNotExists(settings);
-    MetadataImplementor metadata = buildMetadata(settings);
-    SchemaExport schemaExport = new SchemaExport();
-    schemaExport.create(EnumSet.of(TargetType.DATABASE), metadata);
-    initializeSchemaData(settings);
+  public boolean tenantExists(String tenant) throws SQLException {
+    return schemaExists(getSettings(tenant));
   }
 
-  private void createSchemaIfNotExists(Map<String, String> settings) throws SQLException {
+  private void initializeSchema(String schema) throws SQLException {
+    Map<String, String> settings = getSettings(schema);
+    if (schemaExists(settings)) {
+      throw new TenantAlreadyExistsException("Tenant already exists: " + schema);
+    }
+    createSchema(settings);
+    createTables(settings);
+    initializeData(settings);
+  }
+
+  private void createSchema(Map<String, String> settings) throws SQLException {
     String schema = getSchema(settings);
     Connection connection = getConnection(settings);
     Statement statement = connection.createStatement();
-    statement.executeUpdate(String.format("CREATE SCHEMA IF NOT EXISTS %s;", schema));
+    statement.executeUpdate(String.format("CREATE SCHEMA %s;", schema.toUpperCase()));
     statement.close();
     connection.close();
   }
 
-  private void initializeSchemaData(Map<String, String> settings) throws SQLException {
+  private void createTables(Map<String, String> settings) {
+    MetadataImplementor metadata = buildMetadata(settings);
+    SchemaExport schemaExport = new SchemaExport();
+    schemaExport.create(EnumSet.of(TargetType.DATABASE), metadata);
+  }
+
+  private void initializeData(Map<String, String> settings) throws SQLException {
     String schema = getSchema(settings);
     Connection connection = getConnection(settings);
     Statement statement = connection.createStatement();
@@ -101,11 +115,27 @@ public class HibernateSchemaService {
 
   private void dropSchema(Map<String, String> settings) throws SQLException {
     String schema = getSchema(settings);
+    if (!schemaExists(settings)) {
+      throw new TenantDoesNotExistsException("Tenant does not exist: " + schema);
+    }
     Connection connection = getConnection(settings);
     Statement statement = connection.createStatement();
-    statement.executeUpdate(String.format("DROP SCHEMA IF EXISTS %s CASCADE;", schema));
+    statement.executeUpdate(String.format("DROP SCHEMA %s CASCADE;", schema.toUpperCase()));
     statement.close();
     connection.close();
+  }
+
+  private boolean schemaExists(Map<String, String> settings) throws SQLException {
+    String schema = getSchema(settings);
+    Connection connection = getConnection(settings);
+    Statement statement = connection.createStatement();
+    String queryTemplate = "SELECT EXISTS(SELECT 1 FROM information_schema.schemata WHERE schema_name = '%s');";
+    ResultSet resultSet = statement.executeQuery(String.format(queryTemplate, schema.toUpperCase()));
+    resultSet.next();
+    boolean exists = resultSet.getBoolean(1);
+    statement.close();
+    connection.close();
+    return exists;
   }
 
   private Map<String, String> getSettings(String schema) {
