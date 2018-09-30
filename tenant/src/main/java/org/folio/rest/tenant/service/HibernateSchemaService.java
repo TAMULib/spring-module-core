@@ -64,26 +64,30 @@ public class HibernateSchemaService {
     for (String additionalDomainPackage : additionalDomainPackages) {
       domainPackages.add(additionalDomainPackage);
     }
-    initializeSchema(TenantConstants.DEFAULT_TENANT);
+    initializeSchema(getSettings(TenantConstants.DEFAULT_TENANT));
   }
 
   public void createTenant(String tenant) throws SQLException {
-    initializeSchema(tenant);
+    Map<String, String> settings = getSettings(tenant);
+    if (schemaExists(settings)) {
+      throw new TenantAlreadyExistsException("Tenant already exists: " + tenant);
+    }
+    initializeSchema(settings);
   }
 
   public void deleteTenant(String tenant) throws SQLException {
-    dropSchema(getSettings(tenant));
+    Map<String, String> settings = getSettings(tenant);
+    if (!schemaExists(settings)) {
+      throw new TenantDoesNotExistsException("Tenant does not exist: " + tenant);
+    }
+    dropSchema(settings);
   }
 
   public boolean tenantExists(String tenant) throws SQLException {
     return schemaExists(getSettings(tenant));
   }
 
-  private void initializeSchema(String schema) throws SQLException {
-    Map<String, String> settings = getSettings(schema);
-    if (schemaExists(settings)) {
-      throw new TenantAlreadyExistsException("Tenant already exists: " + schema);
-    }
+  private void initializeSchema(Map<String, String> settings) throws SQLException {
     createSchema(settings);
     createTables(settings);
     initializeData(settings);
@@ -93,7 +97,7 @@ public class HibernateSchemaService {
     String schema = getSchema(settings);
     Connection connection = getConnection(settings);
     Statement statement = connection.createStatement();
-    statement.executeUpdate(String.format("CREATE SCHEMA %s;", schema.toUpperCase()));
+    statement.executeUpdate(String.format("CREATE SCHEMA IF NOT EXISTS %s;", schema.toUpperCase()));
     statement.close();
     connection.close();
   }
@@ -115,12 +119,9 @@ public class HibernateSchemaService {
 
   private void dropSchema(Map<String, String> settings) throws SQLException {
     String schema = getSchema(settings);
-    if (!schemaExists(settings)) {
-      throw new TenantDoesNotExistsException("Tenant does not exist: " + schema);
-    }
     Connection connection = getConnection(settings);
     Statement statement = connection.createStatement();
-    statement.executeUpdate(String.format("DROP SCHEMA %s CASCADE;", schema.toUpperCase()));
+    statement.executeUpdate(String.format("DROP SCHEMA IF EXISTS %s CASCADE;", schema.toUpperCase()));
     statement.close();
     connection.close();
   }
