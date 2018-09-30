@@ -29,11 +29,13 @@ public class HibernateMultiTenantConfig {
   }
 
   @Bean
+  // @formatter:off
   public LocalContainerEntityManagerFactoryBean entityManagerFactory(
-      DataSource dataSource,
-      MultiTenantConnectionProvider multiTenantConnectionProvider,
-      CurrentTenantIdentifierResolver currentTenantIdentifierResolver
-    ) {
+    DataSource dataSource,
+    MultiTenantConnectionProvider multiTenantConnectionProvider,
+    CurrentTenantIdentifierResolver currentTenantIdentifierResolver
+  ) {
+  // @formatter:on
     Map<String, Object> properties = new HashMap<>();
     properties.putAll(jpaProperties.getProperties());
     properties.put(Environment.MULTI_TENANT, MultiTenancyStrategy.SCHEMA);
