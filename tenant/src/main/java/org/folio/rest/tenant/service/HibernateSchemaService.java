@@ -4,8 +4,10 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import javax.annotation.PostConstruct;
@@ -19,6 +21,7 @@ import org.hibernate.boot.spi.MetadataImplementor;
 import org.hibernate.tool.hbm2ddl.SchemaExport;
 import org.hibernate.tool.schema.TargetType;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
 import org.springframework.boot.autoconfigure.orm.jpa.JpaProperties;
@@ -38,9 +41,10 @@ public class HibernateSchemaService {
   private final static String HIBERNATE_CONNECTION_PASSWORD = "hibernate.connection.password";
   private final static String HIBERNATE_HBM2DDL_AUTO = "hibernate.hbm2ddl.auto";
 
-  // @formatter:off
-  private static String[] defaultBaseEntityPackages = new String[] { "org.folio.rest.model" };
-  // @formatter:on
+  private final List<String> domainPackages = new ArrayList<String>();
+
+  @Value("${additional.domain.packages:}")
+  private String[] additionalDomainPackages;
 
   @Autowired
   private SqlTemplateService sqlTemplateService;
@@ -53,24 +57,55 @@ public class HibernateSchemaService {
 
   @PostConstruct
   public void initialize() throws SQLException {
-    initializeSchema(TenantConstants.DEFAULT_TENANT, defaultBaseEntityPackages);
+    domainPackages.add("org.folio.rest.model");
+    for (String additionalDomainPackage : additionalDomainPackages) {
+      domainPackages.add(additionalDomainPackage);
+    }
+    initializeSchema(TenantConstants.DEFAULT_TENANT);
   }
 
-  public void initializeTenant(String tenant) throws SQLException {
-    initializeSchema(tenant, defaultBaseEntityPackages);
+  public void createTenant(String tenant) throws SQLException {
+    initializeSchema(tenant);
   }
 
   public void deleteTenant(String tenant) throws SQLException {
-    dropSchema(tenant);
+    dropSchema(getSettings(tenant));
   }
 
-  public void initializeSchema(String schema, String[] baseEntityPackages) throws SQLException {
+  public void initializeSchema(String schema) throws SQLException {
     Map<String, String> settings = getSettings(schema);
     createSchemaIfNotExists(settings);
-    MetadataImplementor metadata = buildMetadata(settings, baseEntityPackages);
+    MetadataImplementor metadata = buildMetadata(settings);
     SchemaExport schemaExport = new SchemaExport();
     schemaExport.create(EnumSet.of(TargetType.DATABASE), metadata);
     initializeSchemaData(settings);
+  }
+
+  private void createSchemaIfNotExists(Map<String, String> settings) throws SQLException {
+    String schema = getSchema(settings);
+    Connection connection = getConnection(settings);
+    Statement statement = connection.createStatement();
+    statement.executeUpdate(String.format("CREATE SCHEMA IF NOT EXISTS %s;", schema));
+    statement.close();
+    connection.close();
+  }
+
+  private void initializeSchemaData(Map<String, String> settings) throws SQLException {
+    String schema = getSchema(settings);
+    Connection connection = getConnection(settings);
+    Statement statement = connection.createStatement();
+    statement.execute(sqlTemplateService.templateImportSql(schema));
+    statement.close();
+    connection.close();
+  }
+
+  private void dropSchema(Map<String, String> settings) throws SQLException {
+    String schema = getSchema(settings);
+    Connection connection = getConnection(settings);
+    Statement statement = connection.createStatement();
+    statement.executeUpdate(String.format("DROP SCHEMA IF EXISTS %s CASCADE;", schema));
+    statement.close();
+    connection.close();
   }
 
   private Map<String, String> getSettings(String schema) {
@@ -87,57 +122,32 @@ public class HibernateSchemaService {
     return settings;
   }
 
-  private void createSchemaIfNotExists(Map<String, String> settings) throws SQLException {
+  private String getSchema(Map<String, String> settings) {
+    return settings.get(HIBERNATE_DEFAULT_SCHEMA);
+  }
+
+  private Connection getConnection(Map<String, String> settings) throws SQLException {
     String jdbcUrl = settings.get(HIBERNATE_CONNECTION_URL);
     String username = settings.get(HIBERNATE_CONNECTION_USERNAME);
     String password = settings.get(HIBERNATE_CONNECTION_PASSWORD);
-    String schema = settings.get(HIBERNATE_DEFAULT_SCHEMA);
-    Connection connection = DriverManager.getConnection(jdbcUrl, username, password);
-    Statement statement = connection.createStatement();
-    statement.executeUpdate(String.format("CREATE SCHEMA IF NOT EXISTS %s;", schema));
-    statement.close();
-    connection.close();
+    return DriverManager.getConnection(jdbcUrl, username, password);
   }
 
-  private void dropSchema(String schema) throws SQLException {
-    Map<String, String> settings = getSettings(schema);
-    String jdbcUrl = settings.get(HIBERNATE_CONNECTION_URL);
-    String username = settings.get(HIBERNATE_CONNECTION_USERNAME);
-    String password = settings.get(HIBERNATE_CONNECTION_PASSWORD);
-    Connection connection = DriverManager.getConnection(jdbcUrl, username, password);
-    Statement statement = connection.createStatement();
-    statement.executeUpdate(String.format("DROP SCHEMA IF EXISTS %s CASCADE;", schema));
-    statement.close();
-    connection.close();
-  }
-
-  private MetadataImplementor buildMetadata(Map<String, String> settings, String[] baseEntityPackages) {
+  private MetadataImplementor buildMetadata(Map<String, String> settings) {
     StandardServiceRegistry registry = new StandardServiceRegistryBuilder().applySettings(settings).build();
-    MetadataSources sources = addEntities(new MetadataSources(registry), baseEntityPackages);
+    MetadataSources sources = addEntities(new MetadataSources(registry));
     return (MetadataImplementor) sources.getMetadataBuilder().build();
   }
 
-  private MetadataSources addEntities(MetadataSources sources, String[] baseEntityPackages) {
+  private MetadataSources addEntities(MetadataSources sources) {
     ClassPathScanningCandidateComponentProvider scanner = new ClassPathScanningCandidateComponentProvider(false);
     scanner.addIncludeFilter(new AnnotationTypeFilter(Entity.class));
-    for (String baseEntityPackage : baseEntityPackages) {
-      for (BeanDefinition beanDefinition : scanner.findCandidateComponents(baseEntityPackage)) {
+    for (String domainPackage : domainPackages) {
+      for (BeanDefinition beanDefinition : scanner.findCandidateComponents(domainPackage)) {
         sources.addAnnotatedClassName(beanDefinition.getBeanClassName());
       }
     }
     return sources;
-  }
-
-  private void initializeSchemaData(Map<String, String> settings) throws SQLException {
-    String jdbcUrl = settings.get(HIBERNATE_CONNECTION_URL);
-    String username = settings.get(HIBERNATE_CONNECTION_USERNAME);
-    String password = settings.get(HIBERNATE_CONNECTION_PASSWORD);
-    String schema = settings.get(HIBERNATE_DEFAULT_SCHEMA);
-    Connection connection = DriverManager.getConnection(jdbcUrl, username, password);
-    Statement statement = connection.createStatement();
-    statement.execute(sqlTemplateService.templateImportSql(schema));
-    statement.close();
-    connection.close();
   }
 
 }

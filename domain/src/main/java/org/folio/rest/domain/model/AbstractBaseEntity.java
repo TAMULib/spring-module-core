@@ -1,7 +1,5 @@
 package org.folio.rest.domain.model;
 
-import java.util.UUID;
-
 import javax.persistence.Column;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
@@ -16,13 +14,13 @@ public abstract class AbstractBaseEntity {
   @GeneratedValue(generator = "UUID")
   @GenericGenerator(name = "UUID", strategy = "org.folio.rest.domain.generator.CustomUUIDGenerator")
   @Column(updatable = false, nullable = false, insertable = true)
-  private UUID id;
+  private String id;
 
-  public UUID getId() {
+  public String getId() {
     return id;
   }
 
-  public void setId(UUID id) {
+  public void setId(String id) {
     this.id = id;
   }
 

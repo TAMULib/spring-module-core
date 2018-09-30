@@ -10,14 +10,14 @@ import org.thymeleaf.spring5.SpringTemplateEngine;
 @Service
 public class SqlTemplateService {
 
-  private final static String SCHEMA_IMPORT_DEFAULT = "schema/import-default";
+  private final static String SCHEMA_IMPORT_INITIAL = "schema/import-initial";
   private final static String SCHEMA = "schema";
 
   @Autowired
   private SpringTemplateEngine templateEngine;
 
   public String templateImportSql(String schema) {
-    return templateEngine.process(SCHEMA_IMPORT_DEFAULT, createContext(SCHEMA, schema));
+    return templateEngine.process(SCHEMA_IMPORT_INITIAL, createContext(SCHEMA, schema));
   }
 
   private Context createContext(String modelName, Object model) {
