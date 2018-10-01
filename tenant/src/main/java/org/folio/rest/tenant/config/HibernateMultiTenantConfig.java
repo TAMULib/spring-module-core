@@ -1,12 +1,15 @@
 package org.folio.rest.tenant.config;
 
+import static org.hibernate.MultiTenancyStrategy.SCHEMA;
+import static org.hibernate.cfg.AvailableSettings.MULTI_TENANT;
+import static org.hibernate.cfg.AvailableSettings.MULTI_TENANT_CONNECTION_PROVIDER;
+import static org.hibernate.cfg.AvailableSettings.MULTI_TENANT_IDENTIFIER_RESOLVER;
+
 import java.util.HashMap;
 import java.util.Map;
 
 import javax.sql.DataSource;
 
-import org.hibernate.MultiTenancyStrategy;
-import org.hibernate.cfg.Environment;
 import org.hibernate.context.spi.CurrentTenantIdentifierResolver;
 import org.hibernate.engine.jdbc.connections.spi.MultiTenantConnectionProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,9 +41,9 @@ public class HibernateMultiTenantConfig {
   // @formatter:on
     Map<String, Object> properties = new HashMap<>();
     properties.putAll(jpaProperties.getProperties());
-    properties.put(Environment.MULTI_TENANT, MultiTenancyStrategy.SCHEMA);
-    properties.put(Environment.MULTI_TENANT_CONNECTION_PROVIDER, multiTenantConnectionProvider);
-    properties.put(Environment.MULTI_TENANT_IDENTIFIER_RESOLVER, currentTenantIdentifierResolver);
+    properties.put(MULTI_TENANT, SCHEMA);
+    properties.put(MULTI_TENANT_CONNECTION_PROVIDER, multiTenantConnectionProvider);
+    properties.put(MULTI_TENANT_IDENTIFIER_RESOLVER, currentTenantIdentifierResolver);
     LocalContainerEntityManagerFactoryBean em = new LocalContainerEntityManagerFactoryBean();
     em.setDataSource(dataSource);
     em.setPackagesToScan("org.folio.rest");

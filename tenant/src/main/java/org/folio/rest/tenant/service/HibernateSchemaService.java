@@ -1,5 +1,7 @@
 package org.folio.rest.tenant.service;
 
+import static org.folio.rest.tenant.TenantConstants.DEFAULT_TENANT;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -14,7 +16,6 @@ import java.util.Map;
 import javax.annotation.PostConstruct;
 import javax.persistence.Entity;
 
-import org.folio.rest.tenant.TenantConstants;
 import org.folio.rest.tenant.exception.TenantAlreadyExistsException;
 import org.folio.rest.tenant.exception.TenantDoesNotExistsException;
 import org.hibernate.boot.MetadataSources;
@@ -59,47 +60,48 @@ public class HibernateSchemaService {
   private JpaProperties jpaProperties;
 
   @PostConstruct
-  public void initialize() throws SQLException {
+  private void initialize() throws SQLException {
     domainPackages.add("org.folio.rest.model");
     for (String additionalDomainPackage : additionalDomainPackages) {
       domainPackages.add(additionalDomainPackage);
     }
-    initializeSchema(getSettings(TenantConstants.DEFAULT_TENANT));
+    Map<String, String> settings = getSettings(DEFAULT_TENANT);
+    Connection connection = getConnection(settings);
+    initializeSchema(connection, settings);
+    connection.close();
   }
 
   public void createTenant(String tenant) throws SQLException {
     Map<String, String> settings = getSettings(tenant);
-    if (schemaExists(settings)) {
+    Connection connection = getConnection(settings);
+    if (schemaExists(connection, tenant)) {
       throw new TenantAlreadyExistsException("Tenant already exists: " + tenant);
     }
-    initializeSchema(settings);
+    initializeSchema(connection, settings);
+    connection.close();
   }
 
   public void deleteTenant(String tenant) throws SQLException {
     Map<String, String> settings = getSettings(tenant);
-    if (!schemaExists(settings)) {
+    Connection connection = getConnection(settings);
+    if (!schemaExists(connection, tenant)) {
       throw new TenantDoesNotExistsException("Tenant does not exist: " + tenant);
     }
-    dropSchema(settings);
+    dropSchema(connection, tenant);
+    connection.close();
   }
 
-  public boolean tenantExists(String tenant) throws SQLException {
-    return schemaExists(getSettings(tenant));
-  }
-
-  private void initializeSchema(Map<String, String> settings) throws SQLException {
-    createSchema(settings);
-    createTables(settings);
-    initializeData(settings);
-  }
-
-  private void createSchema(Map<String, String> settings) throws SQLException {
+  private void initializeSchema(Connection connection, Map<String, String> settings) throws SQLException {
     String schema = getSchema(settings);
-    Connection connection = getConnection(settings);
+    createSchema(connection, schema);
+    createTables(settings);
+    initializeData(connection, schema);
+  }
+
+  private void createSchema(Connection connection, String schema) throws SQLException {
     Statement statement = connection.createStatement();
     statement.executeUpdate(String.format("CREATE SCHEMA IF NOT EXISTS %s;", schema.toUpperCase()));
     statement.close();
-    connection.close();
   }
 
   private void createTables(Map<String, String> settings) {
@@ -108,35 +110,25 @@ public class HibernateSchemaService {
     schemaExport.create(EnumSet.of(TargetType.DATABASE), metadata);
   }
 
-  private void initializeData(Map<String, String> settings) throws SQLException {
-    String schema = getSchema(settings);
-    Connection connection = getConnection(settings);
+  private void initializeData(Connection connection, String schema) throws SQLException {
     Statement statement = connection.createStatement();
     statement.execute(sqlTemplateService.templateImportSql(schema));
     statement.close();
-    connection.close();
   }
 
-  private void dropSchema(Map<String, String> settings) throws SQLException {
-    String schema = getSchema(settings);
-    Connection connection = getConnection(settings);
+  private void dropSchema(Connection connection, String schema) throws SQLException {
     Statement statement = connection.createStatement();
     statement.executeUpdate(String.format("DROP SCHEMA IF EXISTS %s CASCADE;", schema.toUpperCase()));
     statement.close();
-    connection.close();
   }
 
-  private boolean schemaExists(Map<String, String> settings) throws SQLException {
-    String schema = getSchema(settings);
-    Connection connection = getConnection(settings);
+  private boolean schemaExists(Connection connection, String schema) throws SQLException {
     Statement statement = connection.createStatement();
     String queryTemplate = "SELECT EXISTS(SELECT 1 FROM information_schema.schemata WHERE schema_name = '%s');";
     ResultSet resultSet = statement.executeQuery(String.format(queryTemplate, schema.toUpperCase()));
     resultSet.next();
-    boolean exists = resultSet.getBoolean(1);
     statement.close();
-    connection.close();
-    return exists;
+    return resultSet.getBoolean(1);
   }
 
   private Map<String, String> getSettings(String schema) {

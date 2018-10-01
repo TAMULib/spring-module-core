@@ -32,6 +32,7 @@ public class TenantController {
   ) throws SQLException {
   // @formatter:on
     hibernateSchemaService.createTenant(tenant);
+    // TODO: what should the body of the response be?
     return new ResponseEntity<String>("Success", HttpStatus.CREATED);
   }
 

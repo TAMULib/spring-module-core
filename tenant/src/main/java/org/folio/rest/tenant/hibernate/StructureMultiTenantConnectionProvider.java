@@ -1,11 +1,12 @@
 package org.folio.rest.tenant.hibernate;
 
+import static org.folio.rest.tenant.TenantConstants.DEFAULT_TENANT;
+
 import java.sql.Connection;
 import java.sql.SQLException;
 
 import javax.sql.DataSource;
 
-import org.folio.rest.tenant.TenantConstants;
 import org.hibernate.HibernateException;
 import org.hibernate.engine.jdbc.connections.spi.MultiTenantConnectionProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,12 +51,12 @@ public class StructureMultiTenantConnectionProvider implements MultiTenantConnec
       }
 
       // H2
-      // connection.createStatement().execute("USE " + tenantIdentifier);
-      // connection.createStatement().execute("SET SCHEMA " + tenantIdentifier);
+      // connection.createStatement().execute("USE " + tenant);
+      // connection.createStatement().execute("SET SCHEMA " + tenant);
 
       // PostgreSql
-      // connection.setSchema(tenantIdentifier);
-      // connection.createStatement().execute("SET SCHEMA '" + tenantIdentifier + "';");
+      // connection.setSchema(tenant);
+      // connection.createStatement().execute("SET SCHEMA '" + tenant + "';");
     } catch (SQLException e) {
       throw new HibernateException("Could not alter JDBC connection to use schema [" + tenant + "]", e);
     }
@@ -67,10 +68,10 @@ public class StructureMultiTenantConnectionProvider implements MultiTenantConnec
     try {
       switch (platform) {
       case "h2":
-        connection.createStatement().execute("USE " + TenantConstants.DEFAULT_TENANT);
+        connection.createStatement().execute("USE " + DEFAULT_TENANT);
         break;
       case "postgres":
-        connection.setSchema(TenantConstants.DEFAULT_TENANT);
+        connection.setSchema(DEFAULT_TENANT);
         break;
       default:
         throw new HibernateException("Unknown datasource platform [" + platform + "]");
@@ -84,8 +85,7 @@ public class StructureMultiTenantConnectionProvider implements MultiTenantConnec
       // connection.setSchema(DEFAULT_TENANT);
       // connection.createStatement().execute("SET SCHEMA '" + DEFAULT_TENANT + "';");
     } catch (SQLException e) {
-      throw new HibernateException(
-          "Could not alter JDBC connection to use schema [" + TenantConstants.DEFAULT_TENANT + "]", e);
+      throw new HibernateException("Could not alter JDBC connection to use schema [" + DEFAULT_TENANT + "]", e);
     }
     connection.close();
   }
