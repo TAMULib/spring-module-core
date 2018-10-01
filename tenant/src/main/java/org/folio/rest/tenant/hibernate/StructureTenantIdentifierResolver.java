@@ -25,6 +25,7 @@ public class StructureTenantIdentifierResolver implements CurrentTenantIdentifie
       if (tenant != null) {
         return tenant;
       }
+      // NOTE: comment this if wanting to test against default tenant
       throw new NoTenantHeaderException("No tenant header on request!");
     }
     return DEFAULT_TENANT;

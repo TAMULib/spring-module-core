@@ -1,7 +1,5 @@
 package org.folio.rest.tenant.service;
 
-import static org.folio.rest.tenant.TenantConstants.DEFAULT_TENANT;
-
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -60,15 +58,16 @@ public class HibernateSchemaService {
   private JpaProperties jpaProperties;
 
   @PostConstruct
-  private void initialize() throws SQLException {
+  private void initialize() {
     domainPackages.add("org.folio.rest.model");
     for (String additionalDomainPackage : additionalDomainPackages) {
       domainPackages.add(additionalDomainPackage);
     }
-    Map<String, String> settings = getSettings(DEFAULT_TENANT);
-    Connection connection = getConnection(settings);
-    initializeSchema(connection, settings);
-    connection.close();
+    // NOTE: use this if wanting to test against default tenant
+    // Map<String, String> settings = getSettings(DEFAULT_TENANT);
+    // Connection connection = getConnection(settings);
+    // initializeSchema(connection, settings);
+    // connection.close();
   }
 
   public void createTenant(String tenant) throws SQLException {
@@ -127,8 +126,9 @@ public class HibernateSchemaService {
     String queryTemplate = "SELECT EXISTS(SELECT 1 FROM information_schema.schemata WHERE schema_name = '%s');";
     ResultSet resultSet = statement.executeQuery(String.format(queryTemplate, schema.toUpperCase()));
     resultSet.next();
+    boolean exists = resultSet.getBoolean(1);
     statement.close();
-    return resultSet.getBoolean(1);
+    return exists;
   }
 
   private Map<String, String> getSettings(String schema) {
