@@ -10,7 +10,7 @@ import org.thymeleaf.spring5.SpringTemplateEngine;
 @Service
 public class SqlTemplateService {
 
-  private final static String SCHEMA_IMPORT_INITIAL = "schema/import-initial";
+  private final static String SCHEMA_IMPORT_INITIAL = "import/initial";
   private final static String SCHEMA = "schema";
 
   @Autowired
